@@ -1,0 +1,66 @@
+# ============================================================
+# .gitignore — DocMind AI
+# Files and folders that should NOT be pushed to GitHub
+# ============================================================
+
+
+# ── Virtual Environment ──────────────────────────────────────
+venv/
+env/
+.env/
+.venv/
+
+
+# ── Environment Variables (API keys, secrets) ────────────────
+.env
+.env.local
+.env.production
+*.env
+
+
+# ── Python Cache ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+
+# ── ChromaDB (vector database — auto-created on first run) ───
+chroma_db/
+
+
+# ── Streamlit Cache ───────────────────────────────────────────
+.streamlit/secrets.toml
+
+
+# ── OS Files ─────────────────────────────────────────────────
+.DS_Store           # Mac
+Thumbs.db           # Windows
+desktop.ini         # Windows
+
+
+# ── IDE / Editor ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+
+# ── Uploaded Files / Temp Files ──────────────────────────────
+*.pdf
+*.txt
+uploads/
+temp/
+tmp/
+
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+logs/
+
+
+# ── Build / Distribution ─────────────────────────────────────
+dist/
+build/
+*.egg-info/
