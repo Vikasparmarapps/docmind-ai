@@ -49,7 +49,6 @@ desktop.ini         # Windows
 
 # ── Uploaded Files / Temp Files ──────────────────────────────
 *.pdf
-*.txt
 uploads/
 temp/
 tmp/

@@ -2,8 +2,8 @@
 # rag/chain.py — RAG chain with auto local/cloud LLM switching
 # ============================================================
 
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
+from langchain_classic.chains import RetrievalQA
+from langchain_classic.prompts import PromptTemplate
 from config import USE_CLOUD, OLLAMA_MODEL, GEMINI_MODEL, GOOGLE_API_KEY
 
 
