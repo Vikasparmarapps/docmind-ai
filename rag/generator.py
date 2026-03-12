@@ -24,12 +24,23 @@ import json
 
 import streamlit as st
 
-try:
-    from langchain_ollama import OllamaLLM as Ollama
-except ImportError:
-    from langchain_community.llms import Ollama
+from config import USE_CLOUD, OLLAMA_MODEL, GEMINI_MODEL, GOOGLE_API_KEY, get_model_limits
 
-from config import OLLAMA_MODEL, get_model_limits
+
+def _get_llm():
+    if USE_CLOUD:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            model=GEMINI_MODEL,
+            google_api_key=GOOGLE_API_KEY,
+            temperature=0.4,
+        )
+    else:
+        try:
+            from langchain_ollama import OllamaLLM as Ollama
+        except ImportError:
+            from langchain_community.llms import Ollama
+        return Ollama(model=OLLAMA_MODEL, temperature=0.4)
 
 
 # Maps difficulty level to a description the LLM understands
@@ -124,8 +135,9 @@ def _generate_single_batch(
         f"JSON output ({batch_size} pairs):"
     )
 
-    llm = Ollama(model=OLLAMA_MODEL, temperature=0.4)
-    raw_output = llm.invoke(prompt)
+    llm = _get_llm()
+    raw = llm.invoke(prompt)
+    raw_output = raw.content if hasattr(raw, "content") else raw
 
     return _parse_pairs(raw_output, batch_size)
 
