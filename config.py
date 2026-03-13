@@ -21,13 +21,13 @@ USE_CLOUD      = bool(GOOGLE_API_KEY)
 OLLAMA_MODEL = "llama2:7b"   # change to "llama3", "mistral", etc.
 
 # ── Cloud settings (Gemini)
-GEMINI_MODEL = "gemini-1.5-flash"   # free: 1500 req/day
+GEMINI_MODEL = "gemini-2.0-flash"   # free: 1500 req/day
 
 # ── Shared settings
 CHROMA_DIR    = "./chroma_db"
 EMBED_MODEL   = "all-MiniLM-L6-v2"
-CHUNK_SIZE    = 800
-CHUNK_OVERLAP = 100
+CHUNK_SIZE    = 400
+CHUNK_OVERLAP = 50
 
 # ── Model limits (used for Q&A batch generation)
 MODEL_LIMITS = {

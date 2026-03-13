@@ -6,24 +6,23 @@ from langchain_classic.chains import RetrievalQA
 from langchain_classic.prompts import PromptTemplate
 from config import USE_CLOUD, OLLAMA_MODEL, GEMINI_MODEL, GOOGLE_API_KEY
 
-
 PROMPT_TEMPLATE = """You are a knowledgeable AI assistant. Answer the user's question using the context passages below.
-
+ 
 Instructions:
 - Read ALL context passages carefully before answering
 - Give a clear, complete, helpful answer based on what the context says
 - You may combine information from multiple passages
 - If the context genuinely has no relevant information at all, only then say you couldn't find it
 - Do NOT refuse to answer if the context contains relevant information — even partial
-
+ 
 Context passages:
 {context}
-
+ 
 Question: {question}
-
+ 
 Answer (be specific and helpful):"""
-
-
+ 
+ 
 def get_llm():
     """
     Returns the correct LLM based on environment.
@@ -43,17 +42,17 @@ def get_llm():
         except ImportError:
             from langchain_community.llms import Ollama
         return Ollama(model=OLLAMA_MODEL, temperature=0.2)
-
-
+ 
+ 
 def build_chain(vectorstore):
     """Builds the RAG pipeline using the appropriate LLM."""
     llm = get_llm()
-
+ 
     prompt = PromptTemplate(
         template=PROMPT_TEMPLATE,
         input_variables=["context", "question"],
     )
-
+ 
     return RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
@@ -64,8 +63,8 @@ def build_chain(vectorstore):
         return_source_documents=True,
         chain_type_kwargs={"prompt": prompt},
     )
-
-
+ 
+ 
 def ask(question: str, vectorstore) -> dict:
     """Ask a question against the loaded documents."""
     chain = build_chain(vectorstore)
