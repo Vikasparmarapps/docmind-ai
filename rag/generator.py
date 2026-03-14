@@ -31,8 +31,8 @@ def _get_llm():
     if USE_CLOUD:
         from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(
-            model=GEMINI_MODEL,
-            google_api_key=GOOGLE_API_KEY,
+            model=GROQ_MODEL,
+            google_api_key=GROQ_API_KEY,
             temperature=0.4,
         )
     else:
