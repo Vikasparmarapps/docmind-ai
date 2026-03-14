@@ -69,39 +69,94 @@ def _parse_pairs(raw: str, limit: int) -> list:
       2. If JSON fails, fall back to line-by-line parsing
          looking for lines that start with Q1. / A1. / Question: etc.
     """
-    # ── Attempt 1: JSON parsing
+    # ── Attempt 1: Clean markdown fences and try direct JSON parse
     try:
         clean = re.sub(r"```(?:json)?|```", "", raw).strip()
-        match = re.search(r"\[.*\]", clean, re.DOTALL)
-        if match:
-            parsed = json.loads(match.group())
+        parsed = json.loads(clean)
+        if isinstance(parsed, list):
             return [
-                {
-                    "q": str(p.get("q", "")).strip(),
-                    "a": str(p.get("a", "")).strip(),
-                }
+                {"q": str(p.get("q", "")).strip(), "a": str(p.get("a", "")).strip()}
                 for p in parsed
                 if isinstance(p, dict) and p.get("q") and p.get("a")
             ][:limit]
     except Exception:
         pass
 
-    # ── Attempt 2: Line-by-line fallback
+    # ── Attempt 2: Find JSON array anywhere in the text (handles extra prose)
+    try:
+        clean = re.sub(r"```(?:json)?|```", "", raw).strip()
+        match = re.search(r"\[.*?\]", clean, re.DOTALL)
+        if match:
+            parsed = json.loads(match.group())
+            if isinstance(parsed, list):
+                return [
+                    {"q": str(p.get("q", "")).strip(), "a": str(p.get("a", "")).strip()}
+                    for p in parsed
+                    if isinstance(p, dict) and p.get("q") and p.get("a")
+                ][:limit]
+    except Exception:
+        pass
+
+    # ── Attempt 3: Find individual JSON objects {q:..., a:...} scattered in text
+    try:
+        objects = re.findall(r'\{[^{}]*"q"\s*:\s*"[^"]+?"[^{}]*"a"\s*:\s*"[^"]+?"[^{}]*\}', raw, re.DOTALL)
+        if objects:
+            pairs = []
+            for obj in objects[:limit]:
+                parsed = json.loads(obj)
+                if parsed.get("q") and parsed.get("a"):
+                    pairs.append({"q": parsed["q"].strip(), "a": parsed["a"].strip()})
+            if pairs:
+                return pairs
+    except Exception:
+        pass
+
+    # ── Attempt 4: Line-by-line fallback for plain text output
+    # Handles formats like:
+    #   Q1: What is...   A1: The answer...
+    #   Question: ...    Answer: ...
+    #   1. What is...    Answer: ...
     pairs, lines, i = [], raw.strip().split("\n"), 0
     while i < len(lines) and len(pairs) < limit:
         line = lines[i].strip()
-        if re.match(r"^[Qq\d][\.\):]", line) or line.lower().startswith("question"):
+        is_question = (
+            re.match(r"^[Qq]\d*[\.\):\s]", line) or
+            re.match(r"^\d+[\.\)]\s", line) or
+            line.lower().startswith("question")
+        )
+        if is_question:
             q = re.sub(r"^[Qq\d\.\)\:\s]+", "", line).strip()
+            q = re.sub(r"^[Qq]uestion\s*\d*\s*[:]\s*", "", q, flags=re.IGNORECASE).strip()
             a = ""
-            if i + 1 < len(lines):
-                a = re.sub(r"^[Aa\d\.\)\:\s]+", "", lines[i + 1]).strip()
-                i += 2
+            # Look for answer on next non-empty line
+            j = i + 1
+            while j < len(lines):
+                next_line = lines[j].strip()
+                if next_line:
+                    a = re.sub(r"^[Aa\d\.\)\:\s]+", "", next_line).strip()
+                    a = re.sub(r"^[Aa]nswer\s*\d*\s*[:]\s*", "", a, flags=re.IGNORECASE).strip()
+                    i = j + 1
+                    break
+                j += 1
             else:
                 i += 1
             if q:
                 pairs.append({"q": q, "a": a})
         else:
             i += 1
+
+    if pairs:
+        return pairs[:limit]
+
+    # ── Attempt 5: Last resort — split by numbered patterns
+    chunks = re.split(r'\n\s*\d+[\.\)]\s+', raw)
+    pairs = []
+    for chunk in chunks[1:limit+1]:   # skip first empty split
+        lines_c = [l.strip() for l in chunk.strip().split("\n") if l.strip()]
+        if len(lines_c) >= 2:
+            pairs.append({"q": lines_c[0], "a": " ".join(lines_c[1:])})
+        elif len(lines_c) == 1:
+            pairs.append({"q": lines_c[0], "a": ""})
 
     return pairs[:limit]
 
@@ -123,17 +178,17 @@ def _generate_single_batch(
     difficulty_desc = DIFFICULTY_MAP.get(difficulty, "moderate")
 
     prompt = (
-        f"You are an expert educator. Read the document excerpt below and generate "
-        f"EXACTLY {batch_size} question-answer pairs numbered {offset + 1} to {offset + batch_size}.\n"
+        f"Generate EXACTLY {batch_size} question-answer pairs from the document below.\n"
         f"Difficulty: {difficulty_desc}\n"
         f"{lang_note}\n"
-        f"Rules:\n"
-        f"- Each question must be answerable from the text\n"
-        f"- Answers: 1-3 sentences, concise\n"
-        f"- Output ONLY a JSON array, no markdown, no extra text\n"
-        f"- Format: [{{\"q\": \"Question?\", \"a\": \"Answer.\"}}]\n\n"
-        f"Document excerpt:\n{context}\n\n"
-        f"JSON output ({batch_size} pairs):"
+        f"STRICT RULES:\n"
+        f"- Output ONLY a valid JSON array. Nothing else. No intro text, no explanation.\n"
+        f"- Start your response with [ and end with ]\n"
+        f"- Each item: {{\"q\": \"Question here?\", \"a\": \"Answer here.\"}}\n"
+        f"- Questions must be answerable from the text\n"
+        f"- Answers: 1-3 sentences\n\n"
+        f"Document:\n{context}\n\n"
+        f"JSON array only:"
     )
 
     llm = _get_llm()
