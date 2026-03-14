@@ -28,11 +28,16 @@ from config import USE_CLOUD, OLLAMA_MODEL, GROQ_MODEL, GROQ_API_KEY, get_model_
 
 
 def _get_llm():
+    """
+    Returns the correct LLM based on environment.
+    GROQ_API_KEY set → Groq (cloud)
+    No key           → Ollama (local)
+    """
     if USE_CLOUD:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        return ChatGoogleGenerativeAI(
+        from langchain_groq import ChatGroq
+        return ChatGroq(
             model=GROQ_MODEL,
-            google_api_key=GROQ_API_KEY,
+            groq_api_key=GROQ_API_KEY,
             temperature=0.4,
         )
     else:
@@ -85,7 +90,6 @@ def _parse_pairs(raw: str, limit: int) -> list:
     pairs, lines, i = [], raw.strip().split("\n"), 0
     while i < len(lines) and len(pairs) < limit:
         line = lines[i].strip()
-        # Look for lines starting with: Q1. / Q: / Question / 1.
         if re.match(r"^[Qq\d][\.\):]", line) or line.lower().startswith("question"):
             q = re.sub(r"^[Qq\d\.\)\:\s]+", "", line).strip()
             a = ""
@@ -107,13 +111,10 @@ def _generate_single_batch(
     context: str,
     difficulty: str,
     language: str,
-    offset: int,         # how many pairs we've already generated (for numbering)
+    offset: int,
 ) -> list:
     """
     Ask the LLM to generate ONE small batch of Q&A pairs.
-
-    We keep context small (~1800 chars) so the LLM doesn't run out
-    of tokens. The LLM is asked to output a JSON array.
     """
     lang_note = (
         "" if language == "English"
@@ -161,32 +162,23 @@ def generate_qa(n: int, difficulty: str, language: str, raw_chunks: list) -> lis
     if not raw_chunks:
         return []
 
-    # Get batch size and context limit for the current model
     ctx_tokens, _max_pairs, batch_size, _emoji = get_model_limits()
-
-    # Scale context characters based on model size
-    # Small model (4096 tokens) → 1024 chars of context per batch
-    # Large model (128k tokens) → 1800 chars of context per batch
     context_chars = min(1800, max(800, ctx_tokens // 4))
 
-    all_pairs  = []
-    batch_num  = 0
+    all_pairs     = []
+    batch_num     = 0
     total_batches = (n + batch_size - 1) // batch_size
 
-    # Streamlit progress bar — shows "Generating batch 1/3 (0/12 done)..."
     progress = st.progress(0, text="Starting generation...")
 
     while len(all_pairs) < n:
         remaining       = n - len(all_pairs)
         current_batch_n = min(batch_size, remaining)
 
-        # Rotate through chunks so each batch sees a different part of the document
-        # Batch 0 → chunks[0:6], Batch 1 → chunks[3:9], Batch 2 → chunks[6:12]
         chunk_offset = (batch_num * 3) % max(1, len(raw_chunks))
         rotated      = raw_chunks[chunk_offset:] + raw_chunks[:chunk_offset]
         context      = "\n\n".join(rotated[:6])[:context_chars]
 
-        # Update progress bar
         progress_pct = min(batch_num / total_batches, 0.95)
         progress.progress(
             progress_pct,
@@ -198,7 +190,6 @@ def generate_qa(n: int, difficulty: str, language: str, raw_chunks: list) -> lis
             current_batch_n, context, difficulty, language, len(all_pairs)
         )
 
-        # If the LLM returned nothing at all, stop to avoid infinite loop
         if not batch_pairs:
             break
 
@@ -207,7 +198,7 @@ def generate_qa(n: int, difficulty: str, language: str, raw_chunks: list) -> lis
 
     progress.progress(1.0, text=f"Done! {len(all_pairs)} pairs generated.")
 
-    # Remove duplicate questions (compare first 60 chars, lowercased)
+    # Remove duplicate questions
     seen, unique = set(), []
     for pair in all_pairs:
         key = pair["q"].lower()[:60]
