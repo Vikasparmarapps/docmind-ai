@@ -24,7 +24,7 @@ import json
 
 import streamlit as st
 
-from config import USE_CLOUD, OLLAMA_MODEL, GEMINI_MODEL, GOOGLE_API_KEY, get_model_limits
+from config import USE_CLOUD, OLLAMA_MODEL, GROQ_MODEL, GROQ_API_KEY, get_model_limits
 
 
 def _get_llm():
